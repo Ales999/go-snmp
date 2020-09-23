@@ -3,7 +3,7 @@ WapSnmp : SNMP client for golang
 Currently supported operations:
 * SNMP v1/v2c/v3 trap receiver with V3 EngineID auto discovery
 * SNMP v1/v2c Get, GetMultiple, GetNext, GetBulk, Walk
-* SNMP V3     Get, Set, Walk, GetNext, GetMultiple
+* SNMP V3     Get, Set, Walk, GetNext, GetMultiple, GetBulk
 
 Compile
 --------------------------------
@@ -24,4 +24,3 @@ Using the code
 Not supported yet:
 ------------------
 * SNMP Informs receiver
-* SNMP v3 GetBulk (these can be easily implemented since SNMP v3 Walk/Get/GetNext is working)
