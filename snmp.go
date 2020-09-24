@@ -443,6 +443,68 @@ func (w *WapSNMP) GetV3(oid Oid) (interface{}, error) {
 	return val, err
 }
 
+// GetBulk snmpv3 request.
+func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}, error) {
+	requestID := getRandomRequestID()
+	req := []interface{}{Sequence, w.engineID, "",
+		[]interface{}{AsnGetBulkRequest, requestID, 0, maxRepetitions,
+			[]interface{}{Sequence,
+				[]interface{}{Sequence, oid, nil}}}}
+
+	// Function to apply the right level of security parameters and PDU packet
+	finalPacket := w.marshalV3(req)
+
+	response := make([]byte, bufSize, bufSize)
+	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedResponse, err := DecodeSequence(response[:numRead])
+	if err != nil {
+		fmt.Printf("Error decoding GetBulkV3:%v\n", err)
+		return nil, err
+	}
+	/*
+		for i, val := range decodedResponse{
+			fmt.Printf("Resp:%v:type=%v\n",i,reflect.TypeOf(val));
+		}
+	*/
+
+	pduResponse, err := w.unMarshalV3(decodedResponse)
+	if err != nil {
+		fmt.Printf("Error in unMarshalV3:%v\n", err)
+		return nil, err
+	}
+
+	//This helps in recovering from unknown panic situations in reading the packet data
+	// Mostly errors for missing packet data
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovering from panic in GetBulkV3() for %v: %v \n", w.Target, r)
+		}
+	}()
+
+	// Find the varbinds
+	respPacket := pduResponse[3].([]interface{})
+	respVarbinds := respPacket[4].([]interface{})
+	//result := varbinds[1].([]interface{})
+	result := make(map[string]interface{})
+	for _, v := range respVarbinds[1:] { // First element is just a sequence
+		oid := v.([]interface{})[1].(string)
+		value := v.([]interface{})[2]
+
+		// Check if the value is string and printable. To distinguish HEX-String from normal string
+		if res, ok := value.(string); ok && !IsStringAsciiPrintable(value.(string)) {
+			result[oid] = fmt.Sprintf("%x", res)
+		} else {
+			result[oid] = value
+		}
+	}
+
+	return result, nil
+}
+
 // SetV3 sends an SNMP V3 set request to change the value associated with an oid.
 func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	msgID := getRandomRequestID()
