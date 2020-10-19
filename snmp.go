@@ -454,7 +454,7 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	// Function to apply the right level of security parameters and PDU packet
 	finalPacket := w.marshalV3(req)
 
-	response := make([]byte, bufSize, bufSize)
+	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
