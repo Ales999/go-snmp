@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/wk8/go-ordered-map"
 	"io"
 	"log"
 	"math/rand"
@@ -444,7 +445,7 @@ func (w *WapSNMP) GetV3(oid Oid) (interface{}, error) {
 }
 
 // GetBulk snmpv3 request.
-func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}, error) {
+func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}, *orderedmap.OrderedMap, error) {
 	requestID := getRandomRequestID()
 	req := []interface{}{Sequence, w.engineID, "",
 		[]interface{}{AsnGetBulkRequest, requestID, 0, maxRepetitions,
@@ -457,13 +458,13 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
-		return nil, err
+		return nil, &orderedmap.OrderedMap{}, err
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
 		fmt.Printf("Error decoding GetBulkV3:%v\n", err)
-		return nil, err
+		return nil, &orderedmap.OrderedMap{}, err
 	}
 	/*
 		for i, val := range decodedResponse{
@@ -474,7 +475,7 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	pduResponse, err := w.unMarshalV3(decodedResponse)
 	if err != nil {
 		fmt.Printf("Error in unMarshalV3:%v\n", err)
-		return nil, err
+		return nil, &orderedmap.OrderedMap{}, err
 	}
 
 	//This helps in recovering from unknown panic situations in reading the packet data
@@ -488,21 +489,24 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	// Find the varbinds
 	respPacket := pduResponse[3].([]interface{})
 	respVarbinds := respPacket[4].([]interface{})
-	//result := varbinds[1].([]interface{})
-	result := make(map[string]interface{})
+
+	orderedMapResult := orderedmap.New()
+	mapResult := make(map[string]interface{})
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 
 		// Check if the value is string and printable. To distinguish HEX-String from normal string
 		if res, ok := value.(string); ok && !IsStringAsciiPrintable(value.(string)) {
-			result[oid] = fmt.Sprintf("%x", res)
+			orderedMapResult.Set(oid, fmt.Sprintf("%x", res))
+			mapResult[oid] = fmt.Sprintf("%x", res)
 		} else {
-			result[oid] = value
+			orderedMapResult.Set(oid, value)
+			mapResult[oid] = value
 		}
 	}
 
-	return result, nil
+	return mapResult, orderedMapResult, nil
 }
 
 // SetV3 sends an SNMP V3 set request to change the value associated with an oid.
