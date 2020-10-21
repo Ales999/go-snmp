@@ -918,7 +918,6 @@ func (w WapSNMP) GetTable(oid Oid) (*orderedmap.OrderedMap, error) {
 	orderedData := orderedmap.New()
 	lastOid := oid.Copy()
 	for lastOid.Within(oid) {
-		log.Printf("Sending GETBULK(%v, 50)\n", lastOid)
 		_, results, err := w.GetBulk(lastOid, 50)
 		if err != nil {
 			return nil, fmt.Errorf("received GetBulk error => %v\n", err)
