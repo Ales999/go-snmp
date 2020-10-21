@@ -868,25 +868,25 @@ func (w WapSNMP) GetNext(oid Oid) (string, interface{}, error) {
 
    Caveat: many devices will silently drop GETBULK requests for more than some number of maxrepetitions, if
    it doesn't work, try with a lower value and/or use GetTable. */
-func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, error) {
+func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, *orderedmap.OrderedMap, error) {
 	requestID := getRandomRequestID()
 	req, err := EncodeSequence([]interface{}{Sequence, int(w.Version), w.Community,
 		[]interface{}{AsnGetBulkRequest, requestID, 0, maxRepetitions,
 			[]interface{}{Sequence,
 				[]interface{}{Sequence, oid, nil}}}})
 	if err != nil {
-		return nil, err
+		return nil, &orderedmap.OrderedMap{}, err
 	}
 
 	response := make([]byte, bufSize, bufSize)
 	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
-		return nil, err
+		return nil, &orderedmap.OrderedMap{}, err
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
-		return nil, err
+		return nil, &orderedmap.OrderedMap{}, err
 	}
 
 	//This helps in recovering from unknown panic situations in reading the packet data
@@ -902,31 +902,35 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, e
 	respVarbinds := respPacket[4].([]interface{})
 
 	result := make(map[string]interface{})
+	orderedMapResult := orderedmap.New()
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
 		result[oid] = value
+		orderedMapResult.Set(oid, value)
 	}
 
-	return result, nil
+	return result, orderedMapResult, nil
 }
 
 // GetTable efficiently gets an entire table from an SNMP agent. Uses GETBULK requests to go fast.
-func (w WapSNMP) GetTable(oid Oid) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
+func (w WapSNMP) GetTable(oid Oid) (*orderedmap.OrderedMap, error) {
+	orderedData := orderedmap.New()
 	lastOid := oid.Copy()
 	for lastOid.Within(oid) {
 		log.Printf("Sending GETBULK(%v, 50)\n", lastOid)
-		results, err := w.GetBulk(lastOid, 50)
+		_, results, err := w.GetBulk(lastOid, 50)
 		if err != nil {
 			return nil, fmt.Errorf("received GetBulk error => %v\n", err)
 		}
+
 		newLastOid := lastOid.Copy()
-		for o, v := range results {
-			oAsOid := MustParseOid(o)
+		for pair := results.Oldest(); pair != nil; pair = pair.Next() {
+			oAsOid := MustParseOid(pair.Key.(string))
 			if oAsOid.Within(oid) {
-				result[o] = v
+				orderedData.Set(pair.Key, pair.Value)
 			}
+
 			newLastOid = oAsOid
 		}
 
@@ -934,9 +938,11 @@ func (w WapSNMP) GetTable(oid Oid) (map[string]interface{}, error) {
 			// Not making any progress ? Assume we reached end of table.
 			break
 		}
+
 		lastOid = newLastOid
 	}
-	return result, nil
+
+	return orderedData, nil
 }
 
 // ParseTrap parses a received SNMP trap and returns  a map of oid to objects
