@@ -136,7 +136,7 @@ func (o Oid) Copy() Oid {
 
 E.g. MustParseOid("1.2.3").Within("1.2") => true. */
 func (o Oid) Within(other Oid) bool {
-	if len(other) > len(o) {
+	if len(other) >= len(o) {
 		return false
 	}
 	for idx, val := range other {
