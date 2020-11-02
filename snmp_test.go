@@ -28,8 +28,8 @@ func ExampleGetTable() {
 		fmt.Printf("Error getting table => %v\n", wsnmp)
 		return
 	}
-	for k, v := range table {
-		fmt.Printf("%v => %v\n", k, v)
+	for pair := table.Oldest(); pair != nil; pair = pair.Next() {
+		fmt.Printf("%v => %v\n", pair.Key, pair.Value)
 	}
 }
 
@@ -49,7 +49,7 @@ func ExampleGetBulk() {
 	}
 	defer wsnmp.Close()
 	for {
-		results, err := wsnmp.GetBulk(oid, 50)
+		results, _, err := wsnmp.GetBulk(oid, 50)
 		if err != nil {
 			fmt.Printf("GetBulk error => %v\n", err)
 			return

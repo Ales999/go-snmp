@@ -74,7 +74,12 @@ func TestOidDecode(t *testing.T) {
 }
 
 func TestWithin(t *testing.T) {
+	// Shorter length
 	if !MustParseOid("1.2.3").Within(MustParseOid("1.2")) {
+		t.Errorf("Within is not working")
+	}
+	// Same length
+	if MustParseOid("1.2.3").Within(MustParseOid("1.2.3")) {
 		t.Errorf("Within is not working")
 	}
 }
