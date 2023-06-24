@@ -122,9 +122,9 @@ func EncodeLength(length int) []byte {
 }
 
 /*
-	IsStringAsciiPrintable checks if the given string is ASCII and is
-	printable form. Returns boolean value
- */
+IsStringAsciiPrintable checks if the given string is ASCII and is
+printable form. Returns boolean value
+*/
 func IsStringAsciiPrintable(s string) bool {
 	for _, r := range s {
 		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
@@ -134,10 +134,11 @@ func IsStringAsciiPrintable(s string) bool {
 	return true
 }
 
-/* DecodeLength returns the length and the length of the length or an error.
+/*
+DecodeLength returns the length and the length of the length or an error.
 
-   Caveats: Does not support indefinite length. Couldn't find any
-   SNMP packet dump actually using that.
+	Caveats: Does not support indefinite length. Couldn't find any
+	SNMP packet dump actually using that.
 */
 func DecodeLength(toparse []byte) (int, int, error) {
 	// If the first bit is zero, the rest of the first byte indicates the length. Values up to 127 are encoded this way (unless you're using indefinite length, but we don't support that)
@@ -167,7 +168,7 @@ func DecodeLength(toparse []byte) (int, int, error) {
 
 func DecodeCounter64(toparse []byte) (uint64, error) {
 	if len(toparse) > 8 {
-		return 0, fmt.Errorf("Does not support more than 64 bits")
+		return 0, fmt.Errorf("does not support more than 64 bits")
 	}
 	var val uint64
 	val = 0
@@ -182,7 +183,7 @@ func DecodeCounter64(toparse []byte) (uint64, error) {
 func DecodeInt64(bytes []byte) (ret int64, err error) {
 	if len(bytes) > 8 {
 		// We'll overflow an int64 in this case.
-		err = errors.New("Does not support more than 64 bits")
+		err = errors.New("does not support more than 64 bits")
 		return
 	}
 	for bytesRead := 0; bytesRead < len(bytes); bytesRead++ {
@@ -196,12 +197,14 @@ func DecodeInt64(bytes []byte) (ret int64, err error) {
 	return
 }
 
-/* DecodeInteger decodes an integer. This does not handle signed value.
+/*
+DecodeInteger decodes an integer. This does not handle signed value.
 
-   Will error out if it's longer than 64 bits. */
+	Will error out if it's longer than 64 bits.
+*/
 func DecodeInteger(toparse []byte) (int, error) {
 	if len(toparse) > 8 {
-		return 0, fmt.Errorf("Does not support more than 64 bits")
+		return 0, fmt.Errorf("does not support more than 64 bits")
 	}
 	val := 0
 	for _, b := range toparse {
@@ -426,26 +429,18 @@ func EncodeSequence(toEncode []interface{}) ([]byte, error) {
 			// TODO encode length ?
 			toEncap = append(toEncap, byte(AsnInteger))
 			toEncap = append(toEncap, byte(len(enc)))
-			for _, b := range enc {
-				toEncap = append(toEncap, b)
-			}
+			toEncap = append(toEncap, enc...)
 		case uint32:
 			enc := EncodeUInteger32(val)
 			// TODO encode length ?
 			toEncap = append(toEncap, byte(Uinteger32))
 			toEncap = append(toEncap, byte(len(enc)))
-			for _, b := range enc {
-				toEncap = append(toEncap, b)
-			}
+			toEncap = append(toEncap, enc...)
 		case string:
 			enc := []byte(val)
 			toEncap = append(toEncap, byte(AsnOctetStr))
-			for _, b := range EncodeLength(len(enc)) {
-				toEncap = append(toEncap, b)
-			}
-			for _, b := range enc {
-				toEncap = append(toEncap, b)
-			}
+			toEncap = append(toEncap, EncodeLength(len(enc))...)
+			toEncap = append(toEncap, enc...)
 		case Oid:
 			enc, err := val.Encode()
 			if err != nil {
@@ -453,17 +448,11 @@ func EncodeSequence(toEncode []interface{}) ([]byte, error) {
 			}
 			toEncap = append(toEncap, byte(AsnObjectID))
 			encLen := EncodeLength(len(enc))
-			for _, b := range encLen {
-				toEncap = append(toEncap, b)
-			}
-			for _, b := range enc {
-				toEncap = append(toEncap, b)
-			}
+			toEncap = append(toEncap, encLen...)
+			toEncap = append(toEncap, enc...)
 		case IPAddress:
 			toEncap = append(toEncap, byte(Ipaddress))
-			for _, b := range EncodeLength(len(val)) {
-				toEncap = append(toEncap, b)
-			}
+			toEncap = append(toEncap, EncodeLength(len(val))...)
 			for _, b := range val {
 				toEncap = append(toEncap, b)
 			}
@@ -472,20 +461,14 @@ func EncodeSequence(toEncode []interface{}) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			for _, b := range enc {
-				toEncap = append(toEncap, b)
-			}
+			toEncap = append(toEncap, enc...)
 		}
 	}
 
 	l := EncodeLength(len(toEncap))
 	// Encode length ...
 	result := []byte{byte(seqType)}
-	for _, b := range l {
-		result = append(result, b)
-	}
-	for _, b := range toEncap {
-		result = append(result, b)
-	}
+	result = append(result, l...)
+	result = append(result, toEncap...)
 	return result, nil
 }

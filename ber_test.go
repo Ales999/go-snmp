@@ -14,12 +14,12 @@ type LengthTest struct {
 
 func TestLengthDecodingEncoding(t *testing.T) {
 	tests := []LengthTest{
-		LengthTest{[]byte{0x26}, 38, 1},
-		LengthTest{[]byte{0x82, 0x00, 0xc9}, 201, 3},
-		LengthTest{[]byte{0x82, 0x00, 0xca}, 202, 3},
-		LengthTest{[]byte{0x82, 0x00, 0x9f}, 159, 3},
-		LengthTest{[]byte{0x82, 0x01, 0x70}, 368, 3},
-		LengthTest{[]byte{0x82, 0x00, 0xe3}, 227, 3},
+		{[]byte{0x26}, 38, 1},
+		{[]byte{0x82, 0x00, 0xc9}, 201, 3},
+		{[]byte{0x82, 0x00, 0xca}, 202, 3},
+		{[]byte{0x82, 0x00, 0x9f}, 159, 3},
+		{[]byte{0x82, 0x01, 0x70}, 368, 3},
+		{[]byte{0x82, 0x00, 0xe3}, 227, 3},
 	}
 
 	for _, test := range tests {
@@ -38,9 +38,9 @@ func TestLengthDecodingEncoding(t *testing.T) {
 
 func TestDecodeEncodeInteger(t *testing.T) {
 	tests := map[int][]byte{
-		3:          []byte{0x03},
-		523:        []byte{0x02, 0x0b},
-		1191105458: []byte{0x46, 0xfe, 0xd3, 0xb2},
+		3:          {0x03},
+		523:        {0x02, 0x0b},
+		1191105458: {0x46, 0xfe, 0xd3, 0xb2},
 	}
 
 	for testValue, testEncode := range tests {
@@ -64,13 +64,13 @@ func TestDecodeEncodeInteger(t *testing.T) {
 
 func TestEncodeUInteger32(t *testing.T) {
 	tests := map[uint32][]byte{
-		0:          []byte{0x00},
-		3:          []byte{0x03},
-		257:        []byte{0x01, 0x01},
-		65537:      []byte{0x01, 0x00, 0x01},
-		16777217:   []byte{0x01, 0x00, 0x00, 0x01},
-		18542501:   []byte{0x01, 0x1a, 0xef, 0xa5},
-		1191105458: []byte{0x46, 0xfe, 0xd3, 0xb2},
+		0:          {0x00},
+		3:          {0x03},
+		257:        {0x01, 0x01},
+		65537:      {0x01, 0x00, 0x01},
+		16777217:   {0x01, 0x00, 0x00, 0x01},
+		18542501:   {0x01, 0x1a, 0xef, 0xa5},
+		1191105458: {0x46, 0xfe, 0xd3, 0xb2},
 	}
 
 	for testValue, testEncode := range tests {
@@ -89,9 +89,9 @@ type SequenceTest struct {
 
 func TestSequenceDecoding(t *testing.T) {
 	SequenceTests := []SequenceTest{
-		SequenceTest{"3003020100", []interface{}{Sequence, 0}},
-		SequenceTest{"300804067075626c6963", []interface{}{Sequence, "public"}},
-		SequenceTest{"300b04067075626c6963020100", []interface{}{Sequence, "public", 0}},
+		{"3003020100", []interface{}{Sequence, 0}},
+		{"300804067075626c6963", []interface{}{Sequence, "public"}},
+		{"300b04067075626c6963020100", []interface{}{Sequence, "public", 0}},
 	}
 
 	for _, test := range SequenceTests {

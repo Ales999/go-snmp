@@ -11,7 +11,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/wk8/go-ordered-map"
 	"io"
 	"log"
 	"math/rand"
@@ -19,6 +18,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 func password_to_key(password string, engineID string, hash_alg string) string {
@@ -99,7 +100,7 @@ func (w WapSNMP) Set(oid Oid, value interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	response := make([]byte, bufSize, bufSize)
+	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
@@ -113,7 +114,7 @@ func (w WapSNMP) Set(oid Oid, value interface{}) (interface{}, error) {
 	// Fetch the varbinds out of the packet.
 	respPacket := decodedResponse[3].([]interface{})
 	if err := respPacket[2].(int); err != 0 {
-		return nil, fmt.Errorf("Error in setting snmp value: %s \n", SNMPError(err))
+		return nil, fmt.Errorf("error in setting snmp value: %s ", SNMPError(err))
 	}
 
 	varbinds := respPacket[4].([]interface{})
@@ -133,7 +134,7 @@ func (w WapSNMP) Get(oid Oid) (interface{}, error) {
 		return nil, err
 	}
 
-	response := make([]byte, bufSize, bufSize)
+	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
@@ -179,7 +180,7 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	response := make([]byte, bufSize, bufSize)
+	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
 		return nil, err
@@ -222,8 +223,10 @@ func (w WapSNMP) GetMultiple(oids []Oid) (map[string]interface{}, error) {
 	return result, nil
 }
 
-/* SNMP V3 requires a discover packet being sent before a request being sent,
-   so that agent's engineID and other parameters can be automatically detected
+/*
+SNMP V3 requires a discover packet being sent before a request being sent,
+
+	so that agent's engineID and other parameters can be automatically detected
 */
 func (w *WapSNMP) Discover() error {
 	msgID := getRandomRequestID()
@@ -445,7 +448,7 @@ func (w *WapSNMP) GetV3(oid Oid) (interface{}, error) {
 }
 
 // GetBulk snmpv3 request.
-func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}, *orderedmap.OrderedMap, error) {
+func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}, *orderedmap.OrderedMap[string, interface{}], error) {
 	requestID := getRandomRequestID()
 	req := []interface{}{Sequence, w.engineID, "",
 		[]interface{}{AsnGetBulkRequest, requestID, 0, maxRepetitions,
@@ -458,13 +461,13 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, []byte(finalPacket), response, w.retries, w.timeout)
 	if err != nil {
-		return nil, &orderedmap.OrderedMap{}, err
+		return nil, &orderedmap.OrderedMap[string, interface{}]{}, err
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
 		fmt.Printf("Error decoding GetBulkV3:%v\n", err)
-		return nil, &orderedmap.OrderedMap{}, err
+		return nil, &orderedmap.OrderedMap[string, interface{}]{}, err
 	}
 	/*
 		for i, val := range decodedResponse{
@@ -475,7 +478,7 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	pduResponse, err := w.unMarshalV3(decodedResponse)
 	if err != nil {
 		fmt.Printf("Error in unMarshalV3:%v\n", err)
-		return nil, &orderedmap.OrderedMap{}, err
+		return nil, &orderedmap.OrderedMap[string, interface{}]{}, err
 	}
 
 	//This helps in recovering from unknown panic situations in reading the packet data
@@ -490,7 +493,7 @@ func (w *WapSNMP) GetBulkV3(oid Oid, maxRepetitions int) (map[string]interface{}
 	respPacket := pduResponse[3].([]interface{})
 	respVarbinds := respPacket[4].([]interface{})
 
-	orderedMapResult := orderedmap.New()
+	orderedMapResult := orderedmap.New[string, interface{}]()
 	mapResult := make(map[string]interface{})
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
 		oid := v.([]interface{})[1].(string)
@@ -575,7 +578,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	respPrivParam := v3HeaderDecoded[6].(string)
 
 	if len(respAuthParam) == 0 || len(respPrivParam) == 0 {
-		return nil, fmt.Errorf("Error,response is not encrypted.")
+		return nil, fmt.Errorf("error,response is not encrypted")
 	}
 
 	encryptedResp := decodedResponse[4].(string)
@@ -590,7 +593,7 @@ func (w *WapSNMP) SetV3(oid Oid, value interface{}) (interface{}, error) {
 	// Find the varbinds
 	respPacket := pduDecoded[3].([]interface{})
 	if err := respPacket[2].(int); err != 0 {
-		return nil, fmt.Errorf("Error in setting snmp value: %s \n", SNMPError(err))
+		return nil, fmt.Errorf("error in setting snmp value: %s ", SNMPError(err))
 	}
 
 	varbinds := respPacket[4].([]interface{})
@@ -800,7 +803,7 @@ func (w *WapSNMP) unMarshalV3(decodedResponse []interface{}) ([]interface{}, err
 	respPrivParam := v3HeaderDecoded[6].(string)
 
 	if (len(respAuthParam) == 0 || len(respPrivParam) == 0) && w.MessageFlags == AuthPrivReport {
-		return nil, fmt.Errorf("Error,response is not encrypted.")
+		return nil, fmt.Errorf("error,response is not encrypted")
 	}
 	var pduResponse []interface{}
 
@@ -864,29 +867,31 @@ func (w WapSNMP) GetNext(oid Oid) (string, interface{}, error) {
 	return resultOid, resultVal, nil
 }
 
-/* GetBulk is semantically the same as maxRepetitions getnext requests, but in a single GETBULK SNMP packet.
+/*
+GetBulk is semantically the same as maxRepetitions getnext requests, but in a single GETBULK SNMP packet.
 
-   Caveat: many devices will silently drop GETBULK requests for more than some number of maxrepetitions, if
-   it doesn't work, try with a lower value and/or use GetTable. */
-func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, *orderedmap.OrderedMap, error) {
+	Caveat: many devices will silently drop GETBULK requests for more than some number of maxrepetitions, if
+	it doesn't work, try with a lower value and/or use GetTable.
+*/
+func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, *orderedmap.OrderedMap[string, interface{}], error) {
 	requestID := getRandomRequestID()
 	req, err := EncodeSequence([]interface{}{Sequence, int(w.Version), w.Community,
 		[]interface{}{AsnGetBulkRequest, requestID, 0, maxRepetitions,
 			[]interface{}{Sequence,
 				[]interface{}{Sequence, oid, nil}}}})
 	if err != nil {
-		return nil, &orderedmap.OrderedMap{}, err
+		return nil, &orderedmap.OrderedMap[string, interface{}]{}, err
 	}
 
-	response := make([]byte, bufSize, bufSize)
+	response := make([]byte, bufSize)
 	numRead, err := poll(w.conn, req, response, w.retries, w.timeout)
 	if err != nil {
-		return nil, &orderedmap.OrderedMap{}, err
+		return nil, &orderedmap.OrderedMap[string, interface{}]{}, err
 	}
 
 	decodedResponse, err := DecodeSequence(response[:numRead])
 	if err != nil {
-		return nil, &orderedmap.OrderedMap{}, err
+		return nil, &orderedmap.OrderedMap[string, interface{}]{}, err
 	}
 
 	//This helps in recovering from unknown panic situations in reading the packet data
@@ -902,7 +907,7 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, *
 	respVarbinds := respPacket[4].([]interface{})
 
 	result := make(map[string]interface{})
-	orderedMapResult := orderedmap.New()
+	orderedMapResult := orderedmap.New[string, interface{}]()
 	for _, v := range respVarbinds[1:] { // First element is just a sequence
 		oid := v.([]interface{})[1].(string)
 		value := v.([]interface{})[2]
@@ -914,18 +919,20 @@ func (w WapSNMP) GetBulk(oid Oid, maxRepetitions int) (map[string]interface{}, *
 }
 
 // GetTable efficiently gets an entire table from an SNMP agent. Uses GETBULK requests to go fast.
-func (w WapSNMP) GetTable(oid Oid) (*orderedmap.OrderedMap, error) {
-	orderedData := orderedmap.New()
+func (w WapSNMP) GetTable(oid Oid) (*orderedmap.OrderedMap[string, interface{}], error) {
+	orderedData := orderedmap.New[string, interface{}]()
 	lastOid := oid.Copy()
 	for lastOid.Within(oid) {
 		_, results, err := w.GetBulk(lastOid, 50)
 		if err != nil {
-			return nil, fmt.Errorf("received GetBulk error => %v\n", err)
+			return nil, fmt.Errorf("received GetBulk error => %v", err)
 		}
 
 		newLastOid := lastOid.Copy()
 		for pair := results.Oldest(); pair != nil; pair = pair.Next() {
-			oAsOid := MustParseOid(pair.Key.(string))
+			//oAsOid := MustParseOid(pair.Key.(string)) // ?
+			oAsOid := MustParseOid(pair.Key)
+
 			if oAsOid.Within(oid) {
 				orderedData.Set(pair.Key, pair.Value)
 			}
@@ -986,7 +993,7 @@ func (w WapSNMP) ParseTrap(response []byte) error {
 			return errors.New("response is not encrypted")
 		}
 		if len(w.Trapusers) == 0 {
-			return errors.New("No SNMP V3 trap user configured")
+			return errors.New("no SNMP V3 trap user configured")
 		}
 
 		founduser := false
@@ -1001,7 +1008,7 @@ func (w WapSNMP) ParseTrap(response []byte) error {
 			}
 		}
 		if !founduser {
-			return errors.New("No matching user found")
+			return errors.New("no matching user found")
 		}
 
 		//keys

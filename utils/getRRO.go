@@ -4,8 +4,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"google3/experimental/users/cde/wapSnmp/wapSnmp"
+
+	//"google3/experimental/users/cde/wapSnmp/wapSnmp"
 	"time"
+
+	wapSnmp "github.com/ales999/go-snmp"
 )
 
 var target = flag.String("target", "", "The host to connect to")
