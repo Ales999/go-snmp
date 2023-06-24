@@ -20,6 +20,11 @@ vendor/
 # Go workspace file
 go.work
 
+# Block binary from 'make'
+gowalk
+goget
+trapd
+
 # Using custom project
-go.mod
-go.sum
+#go.mod
+#go.sum
